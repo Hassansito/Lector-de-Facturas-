@@ -1,0 +1,6 @@
+@BillReader_HostAddress = http://localhost:5221
+
+GET {{BillReader_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

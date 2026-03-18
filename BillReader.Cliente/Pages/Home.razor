@@ -1,0 +1,20 @@
+﻿@page "/"
+@using BillReader.Cliente.Services.Interfaces
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+    }
+}

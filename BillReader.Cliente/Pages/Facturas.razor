@@ -1,0 +1,160 @@
+﻿@page "/facturas"
+@using BillReader.Cliente.Services.Interfaces
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<h3>Subir facturas</h3>
+
+<InputFile OnChange="HandleFiles" multiple />
+
+<button @onclick="Enviar" class="btn btn-primary" type="button">Subir facturas</button>
+
+<div class="progress my-4">
+    <div class="progress-bar"
+         style="width:@porcentaje%">
+        @porcentaje%
+    </div>
+</div>
+
+<p>@procesadas / @total</p>
+
+<table class="table">
+
+    <tr>
+        <th>Factura</th>
+        <th>Estado</th>
+        <th>Error</th>
+    </tr>
+
+    @foreach (var r in resultados)
+    {
+        <tr>
+            <td>@r.Nombre</td>
+            <td>@(r.Ok ? "OK" : "ERROR")</td>
+            <td>@r.Error</td>
+        </tr>
+    }
+
+</table>
+
+<div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">
+    <div id="facturaToast" class="toast align-items-center text-bg-primary border-0 @(showToast ? "show" : "")" " role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                @mensaje
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    HubConnection hub;
+    private string mensaje;
+    private Timer? timer;
+    private bool showToast => !string.IsNullOrEmpty(mensaje);
+
+    List<IBrowserFile> files = new();
+
+    int procesadas;
+    int total;
+
+    int porcentaje => total == 0 ? 0 : (procesadas * 100) / total;
+
+    List<Resultado> resultados = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+
+        hub = new HubConnectionBuilder()
+        .WithUrl("http://localhost:5221/facturaProgress")
+        .WithAutomaticReconnect()
+        .Build();
+
+        hub.On<int, int, string, bool, string>(
+        "ReceiveProgress",
+        (p, t, f, ok, e) =>
+        {
+            procesadas = p;
+            total = t;
+
+            resultados.Add(new Resultado
+            {
+                Nombre = f,
+                Ok = ok,
+                Error = e
+            });
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hub.StartAsync();
+    }
+
+    void HandleFiles(InputFileChangeEventArgs e)
+    {
+        files = e.GetMultipleFiles(int.MaxValue).ToList();
+
+        total = files.Count;
+
+        StateHasChanged();
+    }
+
+    async Task Enviar()
+    {
+        if (files.Count == 0)
+        {
+            Console.WriteLine("No hay archivos");
+            return;
+        }
+
+        var content = new MultipartFormDataContent();
+
+        foreach (var f in files)
+        {
+            var stream = f.OpenReadStream(100000000);
+
+            content.Add(new StreamContent(stream), "files", f.Name);
+        }
+
+        var response = await Http.PostAsync(
+        "api/Cliente/upload",
+        content);
+        mensaje = "¡Facturas subidas exitosamente!";
+        timer = new Timer(_ =>
+            {
+                InvokeAsync(() =>
+                {
+                    mensaje = null;
+                    StateHasChanged();
+                });
+            }, null, 3000, Timeout.Infinite);
+
+        Console.WriteLine($"Status: {response.StatusCode}");
+    }
+
+    class Resultado
+    {
+        public string Nombre { get; set; }
+        public bool Ok { get; set; }
+        public string Error { get; set; }
+    }
+    private void CerrarMensaje()
+    {
+        mensaje = null;
+        timer?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}

@@ -1,0 +1,173 @@
+﻿@using BillReader.Cliente.Models
+@using Microsoft.JSInterop
+@inject ClienteService ClienteService
+@inject IJSRuntime JS
+
+<!-- Modal -->
+<div class="modal fade" id="exampleModal2" tabindex="-1" aria-labelledby="exampleModal2Label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="exampleModal2Label">Actualizar Cliente</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group mb-3">
+                    <label>
+                        <span class="text-danger">*</span> Name:
+                    </label>
+                    <input type="text" class="form-control" @bind="cliente.Name" />
+                    @if (intentoEnvio && string.IsNullOrWhiteSpace(cliente.Name))
+                    {
+                        <span class="text-danger">El nombre es obligatorio.</span>
+                    }
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>
+                        <span class="text-danger">*</span> Entidad:
+                    </label>
+                    <input type="text" class="form-control" @bind="cliente.Entidad" />
+                    @if (intentoEnvio && string.IsNullOrWhiteSpace(cliente.Entidad))
+                    {
+                        <span class="text-danger">La entidad es obligatoria.</span>
+                    }
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>
+                        <span class="text-danger">*</span> Provincia:
+                    </label>
+                    <input type="text" class="form-control" @bind="cliente.Provincia" />
+                    @if (intentoEnvio && string.IsNullOrWhiteSpace(cliente.Provincia))
+                    {
+                        <span class="text-danger">La provincia es obligatoria.</span>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                @* <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> *@
+                <button class="btn btn-primary" @onclick="EditarCliente">Actualizar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast de notificación -->
+<div class="toast-container position-fixed p-3 top-0 start-50 translate-middle-x p-3">
+    <div class="toast align-items-center text-bg-primary border-0 @(showToast ? "show" : "")" role="alert">
+        <div class="d-flex">
+            <div class="toast-body">@mensaje</div>
+            <button type="button" class="btn-close me-2 m-auto" @onclick="CerrarMensaje"></button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ClienteModel CLienteAEditar { get; set; } = default!;
+    [Parameter] public EventCallback OnClienteActualizado { get; set; }
+
+    private ClienteModel cliente = new();
+    private string? mensaje;
+    private bool showToast => !string.IsNullOrEmpty(mensaje);
+    private Timer? timer;
+    private bool intentoEnvio = false;
+
+    private bool ValidarCampos()
+    {
+        return !(string.IsNullOrWhiteSpace(cliente.Name) ||
+                 string.IsNullOrWhiteSpace(cliente.Entidad) ||
+                 string.IsNullOrWhiteSpace(cliente.Provincia));
+    }
+
+    // Actualizar la copia local cuando cambia el parámetro
+    protected override void OnParametersSet()
+    {
+        if (CLienteAEditar != null)
+        {
+            cliente = new ClienteModel
+            {
+                Id = CLienteAEditar.Id,
+                Name = CLienteAEditar.Name,
+                NumeroCliente = CLienteAEditar.NumeroCliente,
+                Ciclo = CLienteAEditar.Ciclo,
+                Monto = CLienteAEditar.Monto,
+                Entidad = CLienteAEditar.Entidad,
+                Provincia = CLienteAEditar.Provincia,
+            };
+        }
+    }
+
+    // Método público para abrir el modal (llamado desde el padre)
+    public async Task AbrirModal()
+    {
+        await JS.InvokeVoidAsync("eval", "var myModal = new bootstrap.Modal(document.getElementById('exampleModal2')); myModal.show();");
+    }
+
+    private async Task EditarCliente()
+    {
+        intentoEnvio = true; 
+
+        if (!ValidarCampos())
+        {
+            MostrarMensaje("Todos los campos son obligatorios"); 
+            return; 
+        }
+
+        try
+        {
+            var (isSuccess, message, data) = await ClienteService.UpdateClienteAsync(cliente);
+            MostrarMensaje(message);
+            if (isSuccess)
+            {
+                MostrarMensaje("Cliente actualizado correctamente");
+
+                
+                await JS.InvokeVoidAsync("eval",
+                    "bootstrap.Modal.getInstance(document.getElementById('exampleModal2')).hide();");
+
+                
+                await OnClienteActualizado.InvokeAsync();
+            }
+            else
+            {
+                MostrarMensaje("Error al actualizar el cliente");
+            }
+        }
+        catch (Exception ex)
+        {
+            MostrarMensaje($"Error: {ex.Message}");
+        }
+    }
+
+    private void MostrarMensaje(string texto)
+    {
+        mensaje = texto;
+
+        
+        timer?.Dispose();
+
+        
+        timer = new Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                mensaje = null;
+                StateHasChanged();
+            });
+        }, null, 3000, Timeout.Infinite);
+
+        StateHasChanged();
+    }
+
+    private void CerrarMensaje()
+    {
+        mensaje = null;
+        timer?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}

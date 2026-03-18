@@ -1,0 +1,298 @@
+﻿@page "/listado"
+@using BillReader.Cliente.Components
+@using BillReader.Cliente.Services
+@using BillReader.Cliente.Models
+@using BillReader.Cliente.Services.Interfaces
+@using Microsoft.JSInterop
+@inject IAuthService AuthService
+@inject ClienteService ClienteService
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<PageTitle>Informacion de clientes x facturas</PageTitle>
+
+<h1>Clientes</h1>
+
+<p>Esta lista muestra los datos de las facturas insertadas</p>
+
+<!-- Filtro de búsqueda -->
+<div class="mb-3">
+    <input type="text"
+           class="form-control"
+           placeholder="Filtrar por nombre o entidad..."
+           @bind="filtro"
+           @bind:event="oninput"
+           @bind:after="() => paginaActual = 1" />
+</div>
+
+<!-- Componente Actualizar (modal) -->
+<Actualizar @ref="actualizarComponent"
+            CLienteAEditar="clienteSeleccionado"
+            OnClienteActualizado="RecargarLista" />
+
+@if (clientes == null)
+{
+    <p>Cargando...</p>
+}
+else if (!clientes.Any())
+{
+    <p>No hay clientes registrados.</p>
+}
+else if (!clientesFiltrados.Any())
+{
+    <p>No se encontraron clientes que coincidan con el filtro.</p>
+}
+else
+{
+    <!-- Contador de registros -->
+    <div class="mb-3">
+        <strong>Total de registros:</strong> @totalRegistrosFiltrados
+        @if (totalRegistrosFiltrados > 0)
+        {
+            var inicio = ((paginaActual - 1) * registrosPorPagina) + 1;
+            var fin = Math.Min(paginaActual * registrosPorPagina, totalRegistrosFiltrados);
+            <span class="ms-3">Mostrando @inicio - @fin de @totalRegistrosFiltrados</span>
+        }
+    </div>
+
+    <table class="table table-striped table-hover table-bordered table-responsive">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th># cliente</th>
+                <th>Ciclo</th>
+                <th>Monto</th>
+                <th>Entidad</th>
+                <th>Provincia</th>
+                <th class="col-2"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in clientesPaginados)
+            {
+                <tr>
+                    <td>@item.Name</td>
+                    <td>@item.NumeroCliente</td>
+                    <td>@item.Ciclo</td>
+                    <td>@item.Monto</td>
+                    <td>@item.Entidad</td>
+                    <td>@item.Provincia</td>                  
+                    <td>
+                        <div class="dropdown">
+                            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Acciones
+                            </button>
+                            <ul class="dropdown-menu">
+                                <button class="btn btn-sm btn-primary mx-2" @onclick="() => AbrirModalEdicion(item)">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmarEliminar(item.Id)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">
+        <div id="facturaToast" class="toast align-items-center text-bg-primary border-0 @(showToast ? "show" : "")" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    @mensaje
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controles de paginación -->
+    @if (totalPaginasFiltradas > 1)
+    {
+        <nav aria-label="Navegación de páginas">
+            <!-- Selector de página directa -->
+            <div class="d-flex justify-content-center mb-3 gap-2">
+                <span class="mt-2">Ir a página:</span>
+                <input type="number"
+                       min="1"
+                       max="@totalPaginasFiltradas"
+                       @bind="paginaDeseada"
+                       @bind:event="oninput"
+                       @onkeydown="ManejarEnter"
+                       class="form-control"
+                       style="width: 80px;" />
+            </div>
+
+            <ul class="pagination justify-content-center">
+                <!-- Primera -->
+                <li class="page-item @(paginaActual == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(1)">««</button>
+                </li>
+                <!-- Anterior -->
+                <li class="page-item @(paginaActual == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(paginaActual - 1)">Anterior</button>
+                </li>
+
+                @{
+                    int rango = 2;
+                    int inicioPaginas = Math.Max(1, paginaActual - rango);
+                    int finPaginas = Math.Min(totalPaginasFiltradas, paginaActual + rango);
+                }
+
+                @if (inicioPaginas > 1)
+                {
+                    <li class="page-item">
+                        <button class="page-link" @onclick="() => CambiarPagina(1)">1</button>
+                    </li>
+                    @if (inicioPaginas > 2)
+                    {
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    }
+                }
+
+                @for (int i = inicioPaginas; i <= finPaginas; i++)
+                {
+                    <li class="page-item @(i == paginaActual ? "active" : "")">
+                        <button class="page-link" @onclick="() => CambiarPagina(i)">@i</button>
+                    </li>
+                }
+
+                @if (finPaginas < totalPaginasFiltradas)
+                {
+                    @if (finPaginas < totalPaginasFiltradas - 1)
+                    {
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    }
+                    <li class="page-item">
+                        <button class="page-link" @onclick="() => CambiarPagina(totalPaginasFiltradas)">@totalPaginasFiltradas</button>
+                    </li>
+                }
+
+                <!-- Siguiente -->
+                <li class="page-item @(paginaActual == totalPaginasFiltradas ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(paginaActual + 1)">Siguiente</button>
+                </li>
+
+                <!-- Última -->
+                <li class="page-item @(paginaActual == totalPaginasFiltradas ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => CambiarPagina(totalPaginasFiltradas)">»»</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    private List<ClienteModel> clientes;
+    private string mensaje;
+    private string error;
+    private Timer? timer;
+    private string filtro = string.Empty;
+    private Actualizar actualizarComponent;
+    private ClienteModel clienteSeleccionado;
+    private bool showToast => !string.IsNullOrEmpty(mensaje);
+
+    // Paginación
+    private int paginaActual = 1;
+    private int registrosPorPagina = 10;
+    private int paginaDeseada = 1;
+
+    // Lista filtrada (calculada)
+    private List<ClienteModel> clientesFiltrados => clientes?
+        .Where(c => string.IsNullOrEmpty(filtro) ||
+                    (c.Name?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (c.Entidad?.Contains(filtro, StringComparison.OrdinalIgnoreCase) ?? false))
+        .OrderBy(c => c.Id)
+        .ToList() ?? new List<ClienteModel>();
+
+    // Propiedades de paginación sobre filtrados
+    private int totalRegistrosFiltrados => clientesFiltrados.Count;
+    private List<ClienteModel> clientesPaginados => clientesFiltrados
+        .Skip((paginaActual - 1) * registrosPorPagina)
+        .Take(registrosPorPagina)
+        .ToList();
+    private int totalPaginasFiltradas => (int)Math.Ceiling((double)totalRegistrosFiltrados / registrosPorPagina);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+
+        await CargarClientes();
+    }
+
+    private async Task CargarClientes()
+    {
+        try
+        {
+            var lista = await ClienteService.GetAllClientesAsync();
+            clientes = lista.OrderBy(c => c.Id).ToList();
+            paginaActual = 1;
+        }
+        catch (Exception ex)
+        {
+            error = $"Error al cargar: {ex.Message}";
+        }
+    }
+
+    private void CambiarPagina(int nuevaPagina)
+    {
+        if (nuevaPagina >= 1 && nuevaPagina <= totalPaginasFiltradas)
+        {
+            paginaActual = nuevaPagina;
+            paginaDeseada = nuevaPagina;
+        }
+    }
+
+    private void IrAPaginaDeseada()
+    {
+        if (paginaDeseada >= 1 && paginaDeseada <= totalPaginasFiltradas)
+        {
+            CambiarPagina(paginaDeseada);
+        }
+    }
+
+    private void ManejarEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            IrAPaginaDeseada();
+        }
+    }
+
+    private async Task AbrirModalEdicion(ClienteModel item)
+    {
+        clienteSeleccionado = item;
+        if (actualizarComponent != null)
+        {
+            await actualizarComponent.AbrirModal();
+        }
+    }
+
+    private async Task ConfirmarEliminar(Guid id)
+    {
+
+        var resultado = await ClienteService.DeleteClienteAsync(id);
+        mensaje = "¡Cliente eliminado exitosamente!";
+        await CargarClientes();
+        timer?.Dispose();
+        timer = new Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                mensaje = null;
+                StateHasChanged();
+            });
+        }, null, 3000, Timeout.Infinite);
+    }
+
+    private async Task RecargarLista()
+    {
+        await CargarClientes();
+        //mensaje = "Cliente actualizado correctamente.";
+    }
+}

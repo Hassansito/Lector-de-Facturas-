@@ -1,0 +1,54 @@
+﻿@using BillReader.Cliente.Services.Interfaces
+@inherits LayoutComponentBase
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            @if (isAuthenticated)
+            {
+                <div class="d-flex align-items-center ms-auto">
+                    <span class="me-3 text-black">
+                        <span class="bi bi-person-circle me-1"></span> Hola, @userName
+                    </span>
+                    <button class="btn btn-outline-danger btn-sm" @onclick="Logout">
+                        <span class="bi bi-box-arrow-right me-1"></span> Cerrar sesión
+                    </button>
+                </div>
+            }
+            else
+            {
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            }
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private bool isAuthenticated = false;
+    private string userName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (isAuthenticated)
+        {
+            userName = await AuthService.GetUserNameAsync();
+        }
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", true);
+    }
+}
