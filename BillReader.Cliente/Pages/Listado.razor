@@ -4,6 +4,9 @@
 @using BillReader.Cliente.Models
 @using BillReader.Cliente.Services.Interfaces
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize]
 @inject IAuthService AuthService
 @inject ClienteService ClienteService
 @inject IJSRuntime JS
@@ -64,7 +67,9 @@ else
                 <th>Monto</th>
                 <th>Entidad</th>
                 <th>Provincia</th>
+                <AuthorizeView Roles="admin">
                 <th class="col-2"></th>
+                </AuthorizeView>
             </tr>
         </thead>
         <tbody>
@@ -76,7 +81,8 @@ else
                     <td>@item.Ciclo</td>
                     <td>@item.Monto</td>
                     <td>@item.Entidad</td>
-                    <td>@item.Provincia</td>                  
+                    <td>@item.Provincia</td>
+                    <AuthorizeView Roles="admin">
                     <td>
                         <div class="dropdown">
                             <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -92,6 +98,7 @@ else
                             </ul>
                         </div>
                     </td>
+                   </AuthorizeView>
                 </tr>
             }
         </tbody>

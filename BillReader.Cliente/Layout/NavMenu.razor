@@ -1,6 +1,13 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@using BillReader.Cliente.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Lector de Facturas</a>
+        <a class="navbar-brand" href="">BillReader.Cliente</a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -14,26 +21,30 @@
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
             </NavLink>
         </div>
+        <AuthorizeView Roles="admin">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="facturas">
                 <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Facturas
             </NavLink>
         </div>
+        </AuthorizeView>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="listado">
                 <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Listado
             </NavLink>
         </div>
+        <AuthorizeView Roles="admin">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="registro">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Registro de usuarios
+            </NavLink>
+        </div>
+        </AuthorizeView>
     </nav>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
-
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
 }

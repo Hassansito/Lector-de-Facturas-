@@ -3,15 +3,15 @@
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@if (isAuthenticated)
+{
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
 
-    <main>
-        <div class="top-row px-4">
-            @if (isAuthenticated)
-            {
+        <main>
+            <div class="top-row px-4">
                 <div class="d-flex align-items-center ms-auto">
                     <span class="me-3 text-black">
                         <span class="bi bi-person-circle me-1"></span> Hola, @userName
@@ -20,18 +20,20 @@
                         <span class="bi bi-box-arrow-right me-1"></span> Cerrar sesión
                     </button>
                 </div>
-            }
-            else
-            {
-                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-            }
-        </div>
+            </div>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    </div>
+}
+else
+{
+    <div class="container-fluid d-flex align-items-center justify-content-center min-vh-100">
+        @Body
+    </div>
+}
 
 @code {
     private bool isAuthenticated = false;

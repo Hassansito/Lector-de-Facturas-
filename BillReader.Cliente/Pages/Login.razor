@@ -76,8 +76,8 @@
                 var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
 
                 await JS.InvokeVoidAsync("localStorage.setItem", "authToken", result.Token);
-                await JS.InvokeVoidAsync("localStorage.setItem", "userName", result.Nombre);
-                await JS.InvokeVoidAsync("localStorage.setItem", "userRole", result.Rol);
+                // await JS.InvokeVoidAsync("localStorage.setItem", "userName", result.Nombre);
+                // await JS.InvokeVoidAsync("localStorage.setItem", "userRole", result.Rol);
 
                 Navigation.NavigateTo("/", true);
             }
