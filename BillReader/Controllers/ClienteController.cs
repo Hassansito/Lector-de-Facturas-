@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Models.DTO;
+using Repositories.Interfaces;
 using Services.Interfaces;
 
 namespace BillReader.Controllers
@@ -12,10 +13,12 @@ namespace BillReader.Controllers
     {
         private readonly ICLienteService _service;
         private readonly IFileQueue queue;
+        private readonly IClientePDF _clienteRepo;
 
-        public ClienteController(ICLienteService service, IFileQueue queue)
+        public ClienteController(ICLienteService service, IFileQueue queue, IClientePDF clienteRepo)
         {
             _service = service;
+            _clienteRepo = clienteRepo;
             this.queue = queue;
         }
 
@@ -71,7 +74,25 @@ namespace BillReader.Controllers
         public async Task<IActionResult> Delete(Guid id)
         {
             await _service.DeleteAsync(id);
-            return NoContent(); // 204 No Content es la respuesta estándar para DELETE exitoso
+            return NoContent();
+        }
+
+
+        [HttpGet("descargar-factura/{id}")]
+        public async Task<IActionResult> DescargarFactura(Guid id)
+        {
+            var cliente = await _clienteRepo.GetByIdAsync(id);
+            if (cliente == null)
+                return NotFound("Cliente no encontrado");
+
+            if (string.IsNullOrEmpty(cliente.RutaArchivoFactura))
+                return NotFound("No hay factura asociada a este cliente");
+
+            if (!System.IO.File.Exists(cliente.RutaArchivoFactura))
+                return NotFound("El archivo físico no existe en el servidor");
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(cliente.RutaArchivoFactura);
+            return File(bytes, "application/octet-stream", cliente.NombreArchivoFactura ?? "factura.pdf");
         }
 
     }

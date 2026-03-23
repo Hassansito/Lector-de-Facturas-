@@ -1,14 +1,16 @@
-﻿using System.Net.Http;
+﻿using BillReader.Cliente.Models;
+using Microsoft.Extensions.Logging;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
-using BillReader.Cliente.Models;
-using Microsoft.Extensions.Logging;
+using static System.Net.WebRequestMethods;
 
 namespace BillReader.Cliente.Services;
 
 public class ClienteService
 {
     private readonly HttpClient _httpClient;
+    private readonly HttpClient _http;
     private readonly ILogger<ClienteService> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {

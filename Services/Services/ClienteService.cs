@@ -16,11 +16,6 @@ namespace Services.Services
             _repository = repository;
             _mapper = mapper;
         }
-        //public Task<ResponseDTO> CreateAsync(CreateClienteDTO dto)
-        //{
-        //    throw new NotImplementedException();
-        //}
-
         public async Task<List<ResponseDTO>> GetAllAsync()
         {
             var clientes = await _repository.GetAsync();

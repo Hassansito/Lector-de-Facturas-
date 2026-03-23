@@ -16,6 +16,7 @@ builder.Services.AddHttpClient("AuthorizedClient", client =>
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddScoped<DocumentoService>();
 builder.Services.AddScoped<ClienteService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();

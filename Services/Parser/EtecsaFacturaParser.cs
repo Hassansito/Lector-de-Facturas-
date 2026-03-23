@@ -22,9 +22,9 @@ public class EtecsaFacturaParser : IFacturaParser
     // Palabras clave que indican que una línea no es parte del nombre del cliente
     private static readonly string[] KeywordsExcluir = new[]
     {
-        "NÚMERO", "NUMERO", "DIRECCIÓN", "DIRECCION", "PERIODO", "OFICINA", "FACTURA", "FITECSA",
+        "NÚMERO", "NUMERO", "PERIODO", "FACTURA", "FITECSA",
         "CUOTA", "CONSUMO", "COMISIÓN", "COMISION", "IMPUESTO", "FACTURADO", "CRÉDITO", "CREDITO",
-        "PAGAR", "TOTAL", "DESGLOSE", "RESUMEN", "SERVICIO", "IMPORTE", "CARGOS", "MISCELÁNEOS",
+        "PAGAR", "TOTAL", "DESGLOSE", "RESUMEN", "IMPORTE", "CARGOS", "MISCELÁNEOS",
         "CUENTA", "MONEDA", "FECHA", "VENCIMIENTO", "PAGAR A", "CUENTA", "NO.FACTURA", "FOLIO",
         "PROLONGACIÓN", "CARRETERA", "CALLE", "AVENIDA", "AVE", "KM", "EDIFICIO", "PISO"
     };
@@ -56,7 +56,7 @@ public class EtecsaFacturaParser : IFacturaParser
 
         // 4. Oficina
         string oficina = "";
-        var matchOficina = Regex.Match(texto, @"Oficina:\s*(.*?)(?=\r?\n|$)", RegexOptions.IgnoreCase);
+        var matchOficina = Regex.Match(texto, @"Pagar a:\s*(.*?)(?=\r?\n|$)", RegexOptions.IgnoreCase);
         if (matchOficina.Success)
             oficina = matchOficina.Groups[1].Value.Trim();
         else
@@ -116,8 +116,8 @@ public class EtecsaFacturaParser : IFacturaParser
             // Excluir si es la provincia encontrada (para evitar duplicados)
             if (!string.IsNullOrEmpty(provincia) && lineaTrim.Contains(provincia)) continue;
 
-            // Excluir líneas muy cortas (menos de 3 palabras) para evitar encabezados sueltos
-            if (lineaTrim.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 3) continue;
+            // Excluir líneas muy cortas (menos de 4 palabras) para evitar encabezados sueltos
+            //if (lineaTrim.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 4) continue;
 
             lineasNombre.Add(lineaTrim);
         }
@@ -125,10 +125,10 @@ public class EtecsaFacturaParser : IFacturaParser
         string nombre = lineasNombre.Count > 0 ? string.Join(" ", lineasNombre) : "";
 
         // Si no se encontró nombre, usar la primera línea no vacía como fallback
-        if (string.IsNullOrWhiteSpace(nombre))
-        {
-            nombre = lineas.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim() ?? "";
-        }
+        //if (string.IsNullOrWhiteSpace(nombre))
+        //{
+        //    nombre = lineas.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim() ?? "";
+        //}
 
         return new ClienteEntity
         {

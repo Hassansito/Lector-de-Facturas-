@@ -19,5 +19,7 @@ namespace Models.Entities
         public decimal Monto { get; set; }
         public required  string Entidad { get; set; }
         public required string Provincia {  get; set; }
+        public string? RutaArchivoFactura { get; set; }
+        public string? NombreArchivoFactura { get; set; }
     }
 }

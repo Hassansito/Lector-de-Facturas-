@@ -10,7 +10,6 @@ namespace Services.Interfaces
     public interface ICLienteService
     {
         Task<List<ResponseDTO>> GetAllAsync();
-        //Task<ResponseDTO> CreateAsync(CreateClienteDTO dto);
         Task<ResponseDTO> UpdateAsync(Guid id, UpdateClienteDTO dto);
         Task DeleteAsync(Guid id);
     }
