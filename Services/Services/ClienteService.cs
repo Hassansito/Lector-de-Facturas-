@@ -50,22 +50,18 @@ namespace Services.Services
             return _mapper.Map<ResponseDTO>(cliente);
         }
         public async Task DeleteAsync(Guid id)
-        {
-            // 1. Obtener el cliente con su ruta de archivo
+        {            
             var cliente = await _repository.GetByIdAsync(id);
             if (cliente == null)
                 throw new KeyNotFoundException($"No se encontró el cliente con ID {id}");
 
-            // 2. Guardar la ruta antes de eliminar el registro
             var filePath = cliente.RutaArchivoFactura;
 
-            // 3. Eliminar el registro de la base de datos
             _repository.Delete(cliente);
             bool guardado = await _repository.SaveChangesAsync();
             if (!guardado)
                 throw new DbUpdateConcurrencyException("El cliente fue eliminado por otro usuario.");
 
-            // 4. Si hay un archivo asociado, intentar eliminarlo
             if (!string.IsNullOrEmpty(filePath))
             {
                 try

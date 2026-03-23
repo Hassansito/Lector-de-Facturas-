@@ -6,6 +6,7 @@
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using BillReader.Cliente.Components.UI
 @attribute [Authorize]
 @inject IAuthService AuthService
 @inject ClienteService ClienteService
@@ -28,6 +29,15 @@
            @bind:event="oninput"
            @bind:after="() => paginaActual = 1" />
 </div>
+
+@if (selectedIds.Any())
+{
+    <div class="mb-3">
+        <button class="btn btn-danger" @onclick="AbrirModalMultiples">
+            Eliminar seleccionados (@selectedIds.Count)
+        </button>
+    </div>
+}
 
 <!-- Componente Actualizar (modal) -->
 <Actualizar @ref="actualizarComponent"
@@ -62,6 +72,11 @@ else
     <table class="table table-striped table-hover table-bordered table-responsive">
         <thead>
             <tr>
+                <AuthorizeView Roles="admin">
+                    <th style="width: 40px;">
+                        <input type="checkbox" checked="@selectAll" @onchange="ToggleSelectAll" />
+                    </th>
+                </AuthorizeView>
                 <th>Nombre</th>
                 <th># cliente</th>
                 <th>Ciclo</th>
@@ -77,6 +92,13 @@ else
             @foreach (var item in clientesPaginados)
             {
                 <tr>
+                    <AuthorizeView Roles="admin">
+                        <td style="width: 40px;">
+                            <input type="checkbox"
+                                   checked="@selectedIds.Contains(item.Id)"
+                                   @onchange="(e) => ToggleSelection(item.Id, e.Value)" />
+                        </td>
+                    </AuthorizeView>
                     <td>@item.Name</td>
                     <td>@item.NumeroCliente</td>
                     <td>@item.Ciclo</td>
@@ -93,7 +115,7 @@ else
                                 <button class="btn btn-sm btn-primary mx-2" @onclick="() => AbrirModalEdicion(item)">
                                     <i class="bi bi-pencil-fill"></i>
                                 </button>
-                                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmarEliminar(item.Id)">
+                                    <button class="btn btn-sm btn-danger" @onclick="() => AbrirModalEliminar(item.Id)">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                     <button class="btn btn-sm btn-success" @onclick="() => DescargarFactura(item.Id)">
@@ -118,6 +140,12 @@ else
             </div>
         </div>
     </div>
+
+    <ConfirmDeleteModal Show="@showDeleteModal"
+                        Count="@(idToDelete.HasValue ? 1 : selectedIds.Count)"
+                        IdToDelete="@idToDelete"
+                        OnConfirm="EliminarPorConfirmar"
+                        OnCancel="CancelarEliminacion" />
 
     <!-- Controles de paginación -->
     @if (totalPaginasFiltradas > 1)
@@ -205,6 +233,10 @@ else
     private Actualizar actualizarComponent;
     private ClienteModel clienteSeleccionado;
     private bool showToast => !string.IsNullOrEmpty(mensaje);
+    private List<Guid> selectedIds = new List<Guid>();
+    private bool selectAll = false;    
+    private bool showDeleteModal = false;
+    private Guid? idToDelete = null;
 
     // Paginación
     private int paginaActual = 1;
@@ -257,6 +289,7 @@ else
         {
             paginaActual = nuevaPagina;
             paginaDeseada = nuevaPagina;
+            ClearSelection();
         }
     }
 
@@ -285,12 +318,12 @@ else
         }
     }
 
-    private async Task ConfirmarEliminar(Guid id)
+    private async Task EliminarClienteIndividual(Guid id)
     {
-
         var resultado = await ClienteService.DeleteClienteAsync(id);
-        mensaje = "¡Cliente eliminado exitosamente!";
         await CargarClientes();
+
+        mensaje = resultado ? "¡Cliente eliminado exitosamente!" : "Error al eliminar cliente.";
         timer?.Dispose();
         timer = new Timer(_ =>
         {
@@ -300,6 +333,20 @@ else
                 StateHasChanged();
             });
         }, null, 3000, Timeout.Infinite);
+    }
+
+    private async Task EliminarPorConfirmar()
+    {
+        if (idToDelete.HasValue)
+        {
+            await EliminarClienteIndividual(idToDelete.Value);
+            idToDelete = null;
+        }
+        else
+        {
+            await EliminarSeleccionados();
+        }
+        showDeleteModal = false;
     }
 
     private async Task RecargarLista()
@@ -315,4 +362,103 @@ else
         await JS.InvokeVoidAsync("downloadFileFromStream",
             $"factura_{clienteId}.pdf", streamRef);
     }
+
+    private void ToggleSelection(Guid id, object isChecked)
+    {
+        if ((bool)isChecked)
+        {
+            if (!selectedIds.Contains(id))
+                selectedIds.Add(id);
+        }
+        else
+        {
+            selectedIds.Remove(id);
+        }
+        selectAll = clientesPaginados.All(c => selectedIds.Contains(c.Id));
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        selectAll = (bool)e.Value;
+
+        if (selectAll)
+        {
+            foreach (var item in clientesPaginados)
+            {
+                if (!selectedIds.Contains(item.Id))
+                    selectedIds.Add(item.Id);
+            }
+        }
+        else
+        {
+            foreach (var item in clientesPaginados)
+            {
+                selectedIds.Remove(item.Id);
+            }
+        }
+        StateHasChanged();
+    }
+
+    private void ClearSelection()
+    {
+        selectedIds.Clear();
+        selectAll = false;
+        StateHasChanged();
+    }
+
+    private async Task EliminarSeleccionados()
+    {
+        int eliminados = 0;
+        int errores = 0;
+
+        foreach (var id in selectedIds.ToList())
+        {
+            try
+            {
+                var result = await ClienteService.DeleteClienteAsync(id);
+                if (result)
+                    eliminados++;
+                else
+                    errores++;
+            }
+            catch
+            {
+                errores++;
+            }
+        }
+
+        selectedIds.Clear();
+        selectAll = false;
+
+        await CargarClientes();
+
+        mensaje = $"Eliminados: {eliminados} cliente(s)";
+        timer?.Dispose();
+        timer = new Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                mensaje = null;
+                StateHasChanged();
+            });
+        }, null, 3000, Timeout.Infinite);
+    }
+
+    private void CancelarEliminacion()
+    {
+        showDeleteModal = false;
+    }
+
+    private void AbrirModalMultiples()
+    {
+        idToDelete = null;
+        showDeleteModal = true;
+    }
+
+    private void AbrirModalEliminar(Guid id)
+    {
+        idToDelete = id;
+        showDeleteModal = true;
+    }
+
 }

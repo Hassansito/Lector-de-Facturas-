@@ -1,0 +1,29 @@
+﻿<div class="modal fade @(Show ? "show d-block" : "")"
+     tabindex="-1"
+     role="dialog"
+     style="@(Show ? "background-color: rgba(0,0,0,0.5); display:block;" : "display:none;")">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" @onclick="OnCancel" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro de eliminar <strong>@Count</strong> cliente(s)?</p>
+                <p>Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="OnCancel">Cancelar</button>
+                <button type="button" class="btn btn-danger" @onclick="OnConfirm">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public int Count { get; set; }
+    [Parameter] public Guid? IdToDelete { get; set; }  
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}
