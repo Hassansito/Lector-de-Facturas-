@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Models.DTO;
 using Repositories.Interfaces;
 using Services.Interfaces;
@@ -10,11 +11,13 @@ namespace Services.Services
     {
         private readonly IClientePDF _repository;
         private readonly IMapper _mapper;
+        private readonly ILogger<ClienteService> _logger;
 
-        public ClienteService(IClientePDF repository, IMapper mapper)
+        public ClienteService(IClientePDF repository, IMapper mapper, ILogger<ClienteService> logger)
         {
             _repository = repository;
             _mapper = mapper;
+            _logger = logger;
         }
         public async Task<List<ResponseDTO>> GetAllAsync()
         {
@@ -46,25 +49,42 @@ namespace Services.Services
 
             return _mapper.Map<ResponseDTO>(cliente);
         }
-
         public async Task DeleteAsync(Guid id)
         {
-            
+            // 1. Obtener el cliente con su ruta de archivo
             var cliente = await _repository.GetByIdAsync(id);
-
-            
             if (cliente == null)
                 throw new KeyNotFoundException($"No se encontró el cliente con ID {id}");
 
-            
+            // 2. Guardar la ruta antes de eliminar el registro
+            var filePath = cliente.RutaArchivoFactura;
+
+            // 3. Eliminar el registro de la base de datos
             _repository.Delete(cliente);
-
             bool guardado = await _repository.SaveChangesAsync();
-
-            
             if (!guardado)
-            {
                 throw new DbUpdateConcurrencyException("El cliente fue eliminado por otro usuario.");
+
+            // 4. Si hay un archivo asociado, intentar eliminarlo
+            if (!string.IsNullOrEmpty(filePath))
+            {
+                try
+                {
+                    if (File.Exists(filePath))
+                    {
+                        File.Delete(filePath);
+                        _logger.LogInformation("Archivo de factura eliminado: {FilePath}", filePath);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No se encontró el archivo para eliminar: {FilePath}", filePath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Sólo logueamos el error, no lanzamos excepción para no afectar la eliminación del cliente
+                    _logger.LogError(ex, "Error al eliminar archivo físico {FilePath}", filePath);
+                }
             }
         }
 
