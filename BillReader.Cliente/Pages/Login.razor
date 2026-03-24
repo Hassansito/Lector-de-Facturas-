@@ -24,8 +24,8 @@
 
             <div class="mb-3">
                 <label for="password" class="form-label">Contraseña</label>
-                <InputText id="password" class="form-control" @bind-Value="loginModel.Password" 
-                               placeholder="Ingrese su contraseña" autocomplete="current-password" />
+                <InputText id="password" type="password" class="form-control" @bind-Value="loginModel.Password"
+                           placeholder="Ingrese su contraseña" autocomplete="current-password" />
             </div>
 
             @if (!string.IsNullOrEmpty(errorMessage))
