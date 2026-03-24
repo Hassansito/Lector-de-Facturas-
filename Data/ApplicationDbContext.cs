@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using BCrypt.Net;
+using Microsoft.EntityFrameworkCore;
 using Models.Entities;
 namespace Data
 {
@@ -15,6 +16,20 @@ namespace Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            string passwordAdmin = "admin";
+            string passwordHash = HashPassword(passwordAdmin);
+
+            modelBuilder.Entity<Usuario>().HasData(
+            new Usuario
+            {
+                Id = Guid.NewGuid(),
+                NombreUsuario = "admin",
+                PasswordHash = passwordHash,
+                Rol = "admin",
+                CreatedDate = DateTime.UtcNow
+            }
+        );
+
             modelBuilder.Entity<Usuario>(entity =>
             {
                 entity.HasIndex(u => u.NombreUsuario).IsUnique();
@@ -34,6 +49,11 @@ namespace Data
             {
                 entity.Property(e => e.Id).HasDefaultValueSql("gen_random_uuid()");
             });
+        }
+
+        public string HashPassword(string password)
+        {
+            return BCrypt.Net.BCrypt.HashPassword(password);
         }
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
