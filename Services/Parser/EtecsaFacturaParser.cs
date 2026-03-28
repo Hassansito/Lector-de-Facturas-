@@ -9,6 +9,7 @@ public interface IFacturaParser
 {
     ClienteEntity Parse(Stream pdfStream);
 }
+
 public class EtecsaFacturaParser : IFacturaParser
 {
     // Lista completa de provincias cubanas (sin acentos para comparación)
@@ -25,14 +26,15 @@ public class EtecsaFacturaParser : IFacturaParser
         "NÚMERO", "NUMERO", "PERIODO", "FACTURA", "FITECSA",
         "CUOTA", "CONSUMO", "COMISIÓN", "COMISION", "IMPUESTO", "FACTURADO", "CRÉDITO", "CREDITO",
         "PAGAR", "TOTAL", "DESGLOSE", "RESUMEN", "IMPORTE", "CARGOS", "MISCELÁNEOS",
-        "CUENTA", "MONEDA", "FECHA", "VENCIMIENTO", "PAGAR A", "CUENTA", "NO.FACTURA", "FOLIO",
-        "PROLONGACIÓN", "CARRETERA", "CALLE", "AVENIDA", "AVE", "KM", "EDIFICIO", "PISO"
+        "CUENTA", "MONEDA", "FECHA", "VENCIMIENTO", "PAGAR A", "NO.FACTURA", "FOLIO",
+        "PROLONGACIÓN", "CARRETERA", "CALLE", "AVENIDA", "AVE", "KM", "EDIFICIO", "PISO",
+        "ZONA POSTAL", "OFICINA"   // Agregadas para mayor precisión
     };
 
     public ClienteEntity Parse(Stream pdfStream)
     {
         var texto = ExtraerTexto(pdfStream);
-        var lineas = texto.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        var lineas = texto.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
         // 1. Número de cliente
         var numeroCliente = Regex.Match(texto, @"Número de Cliente\s*:\s*(\d+)", RegexOptions.IgnoreCase).Groups[1].Value;
@@ -98,37 +100,8 @@ public class EtecsaFacturaParser : IFacturaParser
             provincia = BuscarProvinciaEnTexto(texto);
         }
 
-        // 6. Nombre del cliente: líneas que contengan solo letras mayúsculas y espacios,
-        //    que no sean palabras clave y que no sean la provincia.
-        var lineasNombre = new List<string>();
-        foreach (var linea in lineas)
-        {
-            string lineaTrim = linea.Trim();
-            if (string.IsNullOrWhiteSpace(lineaTrim)) continue;
-
-            // Verificar si la línea contiene solo letras mayúsculas (con acentos) y espacios
-            if (!Regex.IsMatch(lineaTrim, @"^[A-ZÁÉÍÓÚÑ\s]+$")) continue;
-
-            // Excluir si contiene alguna palabra clave
-            bool contieneKeyword = KeywordsExcluir.Any(k => lineaTrim.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0);
-            if (contieneKeyword) continue;
-
-            // Excluir si es la provincia encontrada (para evitar duplicados)
-            if (!string.IsNullOrEmpty(provincia) && lineaTrim.Contains(provincia)) continue;
-
-            // Excluir líneas muy cortas (menos de 4 palabras) para evitar encabezados sueltos
-            //if (lineaTrim.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 4) continue;
-
-            lineasNombre.Add(lineaTrim);
-        }
-
-        string nombre = lineasNombre.Count > 0 ? string.Join(" ", lineasNombre) : "";
-
-        // Si no se encontró nombre, usar la primera línea no vacía como fallback
-        //if (string.IsNullOrWhiteSpace(nombre))
-        //{
-        //    nombre = lineas.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim() ?? "";
-        //}
+        // 6. Nombre del cliente: extracción contextual (reemplazo de la regex anterior)
+        var nombre = ExtraerNombreDeLineas(lineas);
 
         return new ClienteEntity
         {
@@ -142,6 +115,48 @@ public class EtecsaFacturaParser : IFacturaParser
             CreatedDate = DateTime.UtcNow
         };
     }
+
+    private string ExtraerNombreDeLineas(string[] lineas)
+    {
+        var nombreLines = new List<string>();
+
+        foreach (var lineaOriginal in lineas)
+        {
+            var linea = lineaOriginal.Trim();
+            if (string.IsNullOrEmpty(linea))
+                continue;
+
+            // Detener si la línea contiene alguna palabra clave de exclusión
+            bool esExcluir = KeywordsExcluir.Any(k => linea.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (esExcluir)
+                break;
+
+            // Detener si la línea contiene el nombre de alguna provincia (probable dirección)
+            bool esProvincia = Provincias.Any(p => linea.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (esProvincia)
+                break;
+
+            // Detener si la línea contiene números (como "#SN", "123") - típico de direcciones
+            if (Regex.IsMatch(linea, @"\d"))
+                break;
+            // Si ya recolectamos dos líneas y la última tiene un punto, probablemente es el final del nombre
+            if (nombreLines.Count >= 2 && linea.Contains('.'))
+                break;
+
+            nombreLines.Add(linea);
+
+            // Si la línea actual contiene un punto, asumimos que es el final del nombre
+            if (linea.Contains('.'))
+                break;
+
+            // Límite de seguridad: no tomar más de 3 líneas para el nombre
+            if (nombreLines.Count >= 4)
+                break;
+        }
+
+        return string.Join(" ", nombreLines).Trim();
+    }
+
 
     private string BuscarProvinciaEnLinea(string linea)
     {
@@ -196,6 +211,7 @@ public class EtecsaFacturaParser : IFacturaParser
         }
         return "";
     }
+
     private string RemoveDiacritics(string text)
     {
         var normalized = text.Normalize(NormalizationForm.FormD);
